@@ -1,6 +1,1 @@
-{
-  "schemaVersion": 1,
-  "label": "TVBox 配置",
-  "message": "9/10 可用",
-  "color": "orange"
-}
+{"schemaVersion":1,"label":"可用源","message":"23/43","color":"yellow"}
