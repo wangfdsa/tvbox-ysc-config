@@ -1,13 +1,13 @@
 name: Auto Update TVBox Configs
 
-# 注意：GitHub Actions 的 on 字段需加引号，避免被部分 YAML 解析器当作布尔值
+# on 字段加引号，避免被当作布尔值解析
 "on":
-  # 定时触发：每天 02:00 和 14:00（UTC）自动更新
+  # 每天 UTC 02:00 和 14:00（北京时间 10:00 / 22:00）自动更新
   schedule:
     - cron: "0 2,14 * * *"
-  # 支持在 GitHub Actions 页面手动触发
+  # 支持页面手动触发
   workflow_dispatch:
-  # 修改配置或脚本后 push 时触发（仅监听 config/scripts，避免自动提交 output/ 引发死循环）
+  # 修改配置或脚本后 push 触发（只监听这些路径，避免自动提交 output/ 死循环）
   push:
     branches:
       - main
@@ -16,7 +16,6 @@ name: Auto Update TVBox Configs
       - "scripts/**"
       - "requirements.txt"
 
-# 赋予 GITHUB_TOKEN 写仓库权限，用于把更新结果提交回仓库
 permissions:
   contents: write
 
@@ -43,6 +42,8 @@ jobs:
 
       - name: Run update script
         run: python scripts/update.py
+        env:
+          REPO: ${{ github.repository }}
 
       - name: Commit and push changes
         run: |

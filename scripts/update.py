@@ -1,392 +1,382 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-影视仓 / TVBox 配置自动更新脚本
-=================================
-功能：
-  1. 读取 config/sources.json 中的配置源列表
-  2. 对每个源依次尝试"主线 + 备用"多个地址，自动做中文域名 punycode 转换
-  3. 校验返回内容是否为合法的 TVBox/影视仓 单仓配置（包含 sites/spiders/lives 等字段）
-     或 多仓订阅（顶层含 urls 数组）
-  4. 将每个源的最新配置保存到 output/<id>.json
-  5. 生成多仓订阅文件 output/多仓订阅.json（可直接填进影视仓的"订阅"或"多仓"）
-  6. 生成聚合单仓 output/单仓聚合.json（所有源 sites/lives/parses 合并去重）
-  7. 生成 shields 徽章 output/shield.json，并把各源状态写回 README
-兼容：本脚本同时兼容 GitHub Actions 自动运行 与 本地手动运行。
-在 GitHub Actions 中，环境变量 GITHUB_REPOSITORY 会被自动注入（格式 owner/repo），
-用于拼出多仓订阅里指向本仓库 raw 文件的完整 URL。
-用法：
-  python scripts/update.py
+知名 TVBox 源聚合 - GitHub Actions 更新脚本
+- 读 config/sources.json，对每个源的多地址逐个尝试
+- 识别真伪：有效 JSON(sites/urls/storeHouse) / 文本列表 / 图片反爬 / HTML / 失效
+- 生成：多仓订阅、单仓聚合、每个源单独文件、状态报告、README 状态表、shields 徽章
+- 容错：某源本次失败时沿用上次成功缓存（output/cache）
 """
-import datetime
-import json
-import os
-import sys
-import time
-import urllib.parse
+import os, sys, json, re, time
+from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import requests
+try:
+    import requests
+    from requests.adapters import HTTPAdapter
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+    import urllib.request
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_FILE = os.path.join(ROOT, "config", "sources.json")
-OUTPUT_DIR = os.path.join(ROOT, "output")
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 仓库根
+CONFIG = os.path.join(BASE, "config", "sources.json")
+OUTPUT = os.path.join(BASE, "output")
+CACHE = os.path.join(OUTPUT, "cache")
+REPO = os.environ.get("GITHUB_REPOSITORY", "wangfdsa/tvbox-ysc-config")
+# 订阅地址套 gh-proxy 加速前缀，国内机顶盒直连更稳；同时保留 raw 原址可选
+RAW = f"https://gh-proxy.org/https://raw.githubusercontent.com/{REPO}/main/output"
+RAW_DIRECT = f"https://raw.githubusercontent.com/{REPO}/main/output"
 
-DEFAULT_REPO = "YOUR_USERNAME/tvbox-ysc-config"  # 本地运行时的占位仓库名，GitHub Actions 会自动覆盖
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+TIMEOUT = 15
+MAX_WORKERS = 8
 
-# 注意：部分接口的反爬会针对"完整 Chrome UA"下发挑战页，反而用简洁 UA 能正常返回 JSON
-USER_AGENT = "Mozilla/5.0"
-
-TIMEOUT = 15  # 单个地址超时（秒）
-MAX_RETRIES = 2  # 单个地址最大尝试次数（仅对超时/连接类瞬态错误重试）
-RETRY_BACKOFF = 2  # 重试基础等待秒数
-URL_INTERVAL = 1.0  # 每个地址之间的小间隔秒数（降低被限流概率）
-SOURCE_INTERVAL = 2  # 每个源之间的间隔秒数（降低被限流概率）
-
-# 判定"像 TVBox 单仓配置"的顶层字段
-TVBOX_KEYS = ("sites", "spiders", "lives", "store", "exts", "parses", "flags")
-# 多仓订阅格式：顶层为 urls 数组
-MULTI_KEYS = ("urls", "订阅")
-
-
-def _strip_js_comments(text: str) -> str:
-    """剔除 JSON 中内嵌的 // 行注释（部分接口会在字段后追加免责注释）。"""
-    lines = text.split("\n")
-    cleaned = [ln for ln in lines if not ln.lstrip().startswith("//")]
-    return "\n".join(cleaned)
+# 成人内容过滤（高置信度词，避免自动混入黄色站）
+FILTER_ADULT = True
+ADULT_NAME = ["黄av","黄人","成人","色猫","色播","色情","性爱","湿妹","抖阴","souav","jav","18+","🔞","萝莉","麻豆","白嫖","番号","福利姬","偷拍","丝袜","美腿","人妻","熟女","御姐","乱伦","女优","porn","redtube","pornhub","missav","18av","sukebei","小黄书","涩涩","jable","netflav","youav","hanime","淫","艳","骚"]
+ADULT_HOST = ["souav","sex","porn","jav","xvideos","xnxx","18av","caijiav","avzy"]
 
 
-def parse_json_lenient(text: str):
-    """宽容解析：去 BOM/空白、剔 // 注释后优先整体 json.loads；
-    若接口返回了拼接的多段 JSON，取第一段有效对象。"""
-    text = text.lstrip("\ufeff").strip()
-    text = _strip_js_comments(text)
-    try:
-        # strict=False 允许字符串中出现未转义的控制字符（部分接口的 JSON 不规范）
-        return json.loads(text, strict=False)
-    except json.JSONDecodeError:
-        # 兼容"返回了多个 JSON 拼接在一起"的接口
-        decoder = json.JSONDecoder(strict=False)
-        try:
-            obj, _ = decoder.raw_decode(text)
-            return obj
-        except Exception:
-            raise
-
-
-def idn_encode(url: str) -> str:
-    """将 URL 中的中文（国际化）域名转成 punycode，避免 DNS 解析失败。
-    例如：http://www.饭太硬.com/tv -> http://www.xn--sss604efuw.com/tv
-    """
-    parsed = urllib.parse.urlsplit(url)
-    host = parsed.hostname or ""
-    try:
-        encoded_host = host.encode("idna").decode("ascii")
-    except Exception:
-        encoded_host = host  # 已是 ascii 或转换失败，原样使用
-    netloc = encoded_host
-    if parsed.port:
-        netloc = f"{encoded_host}:{parsed.port}"
-    return urllib.parse.urlunsplit(
-        (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
-    )
-
-
-def is_valid_tvbox_config(data) -> bool:
-    """粗略校验：返回内容是否像 TVBox/影视仓 配置（单仓或多仓订阅）。"""
-    if not isinstance(data, dict):
+def is_adult(name="", api=""):
+    if not FILTER_ADULT:
         return False
-    if any(key in data for key in TVBOX_KEYS):
-        return True
-    # 多仓订阅格式：{"urls": [{"name":..., "url":...}, ...]}
-    if "urls" in data and isinstance(data.get("urls"), list) and data["urls"]:
-        return True
-    return False
+    n, u = str(name or "").lower(), str(api or "").lower()
+    return any(k in n for k in ADULT_NAME) or any(k in u for k in ADULT_HOST)
 
 
-def _should_retry(err: Exception, resp_text_len: int = -1) -> bool:
-    """判断失败是否值得重试：
-    - 超时/连接类瞬态错误：重试
-    - 空响应 / JSON 解析失败（疑似服务端反爬冷却）：重试（加长等待）
-    - 4xx/5xx、返回了内容但结构不对（确定性失败）：不重试
-    """
-    if isinstance(err, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
-        return True
-    if isinstance(err, requests.exceptions.HTTPError):
-        return False  # 4xx/5xx 为确定性失败
-    if isinstance(err, json.JSONDecodeError):
-        return True  # 空响应或非 JSON，可能是反爬/冷却，给一次机会
-    if resp_text_len <= 0:
-        return True  # 没有拿到任何内容
-    return False
-
-
-def fetch_config(url: str) -> dict:
-    """抓取单个地址并解析为 JSON dict；失败时抛出异常。"""
-    target = idn_encode(url)
-    last_err = None
-    for attempt in range(1, MAX_RETRIES + 1):
+def to_puny(url):
+    m = re.match(r"^(https?://)([^/:]+)(.*)$", url)
+    if not m:
+        return url
+    host = m.group(2)
+    if any(ord(c) > 127 for c in host):
         try:
-            resp = requests.get(
-                target,
-                headers={
-                    "User-Agent": USER_AGENT,
-                    "Accept": "application/json,text/plain,*/*",
-                },
-                timeout=TIMEOUT,
-                allow_redirects=True,
-            )
-            resp.raise_for_status()
-            data = parse_json_lenient(resp.text)
-            if not is_valid_tvbox_config(data):
-                raise ValueError("返回内容不是 TVBox 配置（缺少 sites/spiders/lives 或 urls 字段）")
-            return data
-        except Exception as e:  # noqa: BLE001
-            last_err = e
-            text_len = len(getattr(resp, "text", "") or "") if "resp" in locals() else -1
-            if _should_retry(e, text_len) and attempt < MAX_RETRIES:
-                wait = RETRY_BACKOFF * attempt * 2
-                print(f"      (第 {attempt} 次失败：{e}，{wait}s 后重试)")
-                time.sleep(wait)
-            else:
-                break
-    raise last_err
+            host = host.encode("idna").decode("ascii")
+        except Exception:
+            pass
+    return m.group(1) + host + m.group(3)
 
 
-def _merge_list(fetched, field):
-    """合并各源中的列表字段（lives/parses/doh 等），按 name/url 去重。"""
-    seen = set()
-    out = []
-    for _sid, _name, data in fetched:
-        for item in data.get(field, []) or []:
-            if isinstance(item, dict):
-                ident = item.get("name") or item.get("url") or json.dumps(
-                    item, ensure_ascii=False, sort_keys=True
-                )
-            else:
-                ident = str(item)
-            if ident in seen:
-                continue
-            seen.add(ident)
-            out.append(item)
-    return out
+def strip_comments(text):
+    return "\n".join(l for l in text.splitlines() if not l.strip().startswith("//"))
 
 
-def merge_configs(fetched):
-    """把多个单仓配置合并成一个聚合单仓：
-    - 以第一个成功源为基底（保留 spider/logo/wallpaper 等）
-    - sites 按 key 去重，重复 key 加源 id 前缀
-    - lives/parses/doh/rules/flags/exts 等列表合并去重
-    fetched: [(sid, name, data_dict), ...]
-    """
-    if not fetched:
-        return None
-    _base_sid, base_name, base = fetched[0]
-    merged = {}
-    skip = {"sites", "lives", "parses", "doh", "rules", "flags", "exts", "ads"}
-    for k, v in base.items():
-        if k not in skip:
-            merged[k] = v
-    merged["warningText"] = (
-        f"本配置由 {len(fetched)} 个公开源自动聚合（含{base_name}等），仅供学习交流，请勿商用"
-    )
-
-    seen_keys = set()
-    sites = []
-    for sid, _name, data in fetched:
-        for s in data.get("sites", []) or []:
-            if not isinstance(s, dict):
-                continue
-            key = s.get("key")
-            if key is None:
-                key = json.dumps(s, ensure_ascii=False, sort_keys=True)
-            new_key = key
-            if key in seen_keys:
-                new_key = f"{sid}_{key}"
-            if new_key in seen_keys:
-                continue
-            seen_keys.add(new_key)
-            if new_key != key:
-                s = dict(s)
-                s["key"] = new_key
-            sites.append(s)
-    merged["sites"] = sites
-
-    for field in ("lives", "parses", "doh", "rules", "flags", "exts"):
-        merged[field] = _merge_list(fetched, field)
-
-    return merged
-
-
-README_PATH = os.path.join(ROOT, "README.md")
-STATUS_START = "<!-- STATUS_START -->"
-STATUS_END = "<!-- STATUS_END -->"
-
-
-def update_readme(status, ok_count, total):
-    """把各源更新状态以表格形式写回 README（在 STATUS_START/END 标记之间）。"""
-    if not os.path.exists(README_PATH):
-        return
-    with open(README_PATH, "r", encoding="utf-8") as f:
-        readme = f.read()
-    if STATUS_START not in readme or STATUS_END not in readme:
-        return  # 未放置标记则不改动
-
-    lines = []
-    lines.append(f"> 🔄 最近更新：{status['updated_at']}（北京时间） · 成功 **{ok_count}/{total}** 个源")
-    lines.append("")
-    lines.append("| 配置源 | 状态 | 使用地址 |")
-    lines.append("| --- | --- | --- |")
-    for s in status["sources"]:
-        if s.get("cached"):
-            lines.append(f"| {s['name']} | 📦 缓存 | 上次成功配置（本次更新未抓到，沿用缓存） |")
-        elif s["ok"]:
-            lines.append(f"| {s['name']} | ✅ 成功 | `{s['used_url']}` |")
+def fetch(url):
+    """返回 (content_bytes, status_code, content_type) 或 (None, err_str, None)"""
+    target = to_puny(url)
+    headers = {"User-Agent": UA, "Accept": "*/*"}
+    try:
+        if HAS_REQUESTS:
+            s = requests.Session()
+            r = s.get(target, headers=headers, timeout=TIMEOUT, allow_redirects=True, verify=False)
+            return r.content, r.status_code, r.headers.get("Content-Type", "")
         else:
-            err = (s.get("error") or "").replace("|", "/")
-            if len(err) > 60:
-                err = err[:57] + "..."
-            lines.append(f"| {s['name']} | ❌ 失败 | {err} |")
-    block = "\n".join(lines)
-
-    prefix = readme.split(STATUS_START, 1)[0]
-    suffix = readme.split(STATUS_END, 1)[1]
-    new_readme = f"{prefix}{STATUS_START}\n{block}\n{STATUS_END}{suffix}"
-    with open(README_PATH, "w", encoding="utf-8") as f:
-        f.write(new_readme)
+            req = urllib.request.Request(target, headers=headers)
+            r = urllib.request.urlopen(req, timeout=TIMEOUT)
+            return r.read(), r.status, r.headers.get("Content-Type", "")
+    except Exception as ex:
+        return None, ("ERR " + str(ex)[:80]), None
 
 
-def write_badge(ok_count, total):
-    """生成 shields.io endpoint 徽章 JSON。"""
-    if total == 0 or ok_count == 0:
-        color = "red"
-    elif ok_count < total:
-        color = "orange"
-    else:
-        color = "green"
-    badge = {
-        "schemaVersion": 1,
-        "label": "TVBox 配置",
-        "message": f"{ok_count}/{total} 可用",
-        "color": color,
-    }
-    with open(os.path.join(OUTPUT_DIR, "shield.json"), "w", encoding="utf-8") as f:
-        json.dump(badge, f, ensure_ascii=False, indent=2)
+def _fix_json_controls(s):
+    """把 JSON 字符串内部未转义的裸换行/制表符替换为空格（如 '优\n酷'）。"""
+    def repl(m):
+        inner = m.group(1)
+        inner = inner.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        inner = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", inner)
+        return '"' + inner + '"'
+    return re.sub(r'"((?:[^"\\]|\\.)*)"', repl, s, flags=re.S)
 
 
-def main() -> int:
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    # 东八区时间，便于阅读
-    tz = datetime.timezone(datetime.timedelta(hours=8))
-    now_str = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-
-    # GitHub Actions 中自动注入 GITHUB_REPOSITORY=owner/repo
-    repo = (
-        os.environ.get("GITHUB_REPOSITORY")
-        or os.environ.get("REPO")
-        or DEFAULT_REPO
-    )
-    raw_base = f"https://gh-proxy.org/https://raw.githubusercontent.com/{repo}/main/output"
-
-    status = {"updated_at": now_str, "repo": repo, "sources": []}
-    subscriptions = []
-    fetched = []  # [(sid, name, data_dict), ...] 用于聚合单仓
-
-    ok_count = 0
-    for src in cfg.get("sources", []):
-        name = src.get("name", "未知")
-        sid = src.get("id", name)
-        urls = src.get("urls", [])
-
-        entry = {"id": sid, "name": name, "ok": False, "used_url": None, "error": None}
-        saved = False
-
-        for url in urls:
+def classify(body):
+    """返回 (kind, data)。kind: single / multi / text / image / html / empty / bad"""
+    if body is None or len(body) < 5:
+        return "empty", None
+    if body[:2] == b"\xff\xd8" or body[2:6] == b"JFIF" or body[:8] == b"\x89PNG\r\n\x1a\n" or body[:6] in (b"GIF87a", b"GIF89a"):
+        return "image", None
+    text = body.decode("utf-8", "ignore")
+    cleaned = strip_comments(text).lstrip("\ufeff \n\r\t")
+    if cleaned.startswith("{"):
+        js = None
+        for candidate in (cleaned, _fix_json_controls(cleaned)):
             try:
-                data = fetch_config(url)
-                out_path = os.path.join(OUTPUT_DIR, f"{sid}.json")
-                with open(out_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                entry["ok"] = True
-                entry["used_url"] = url
-                entry["error"] = None
-                subscriptions.append(
-                    {"name": name, "url": f"{raw_base}/{sid}.json"}
-                )
-                fetched.append((sid, name, data))
-                ok_count += 1
-                saved = True
-                print(f"[OK]   {name} <- {url}")
+                js, _ = json.JSONDecoder().raw_decode(candidate)
                 break
-            except Exception as e:  # noqa: BLE001
-                print(f"[FAIL] {name}  {url}  ->  {e}")
-                entry["error"] = str(e)
+            except Exception:
+                pass
+        if isinstance(js, dict) and js:
+            for mk in ("urls", "storeHouse"):
+                if isinstance(js.get(mk), list):
+                    return "multi", js
+            if isinstance(js.get("sites"), list):
+                return "single", js
+            return "single", js
+        return "bad", None
+    if cleaned[:4].lower() in ("http", "#ext", "#extm3u"):
+        return "text", text
+    if "<html" in cleaned[:500].lower() or "<!doctype" in cleaned[:500].lower():
+        return "html", None
+    if "<html" in cleaned[:5000].lower() or "<div" in cleaned[:2000].lower():
+        p = cleaned.find("{")
+        if p >= 0:
+            try:
+                js, _ = json.JSONDecoder().raw_decode(cleaned[p:])
+                if isinstance(js, dict) and js.get("sites"):
+                    return "single", js
+            except Exception:
+                pass
+    return "bad", None
 
-            # 地址之间稍作间隔，避免被限流
-            time.sleep(URL_INTERVAL)
 
-        if not saved:
-            # 所有地址都失败：尝试使用上一次成功抓取的缓存文件
-            cache_path = os.path.join(OUTPUT_DIR, f"{sid}.json")
-            if os.path.exists(cache_path):
-                try:
-                    with open(cache_path, "r", encoding="utf-8") as f:
-                        cached = json.load(f)
-                    if is_valid_tvbox_config(cached):
-                        subscriptions.append(
-                            {"name": name, "url": f"{raw_base}/{sid}.json"}
-                        )
-                        fetched.append((sid, name, cached))
-                        entry["ok"] = True
-                        entry["cached"] = True
-                        entry["used_url"] = "(缓存)"
-                        ok_count += 1
-                        saved = True
-                        print(f"[CACHE] {name}  使用上次缓存配置")
-                except Exception:
-                    pass
-            if not saved:
-                entry["error"] = entry["error"] or "所有地址均失败"
-                print(f"[FAIL] {name}  全部地址失败")
-        status["sources"].append(entry)
+def multi_items(data):
+    """兼容 urls:[{name,url}] 与 storeHouse:[{sourceName,sourceUrl}] 两种多仓结构。"""
+    if not isinstance(data, dict):
+        return []
+    for key in ("urls", "storeHouse"):
+        arr = data.get(key)
+        if isinstance(arr, list):
+            out = []
+            for x in arr:
+                if isinstance(x, dict):
+                    nm = x.get("name") or x.get("sourceName") or ""
+                    ul = x.get("url") or x.get("sourceUrl") or ""
+                    out.append((nm, ul))
+                elif isinstance(x, str) and x.startswith("http"):
+                    out.append(("", x))
+            return out
+    return []
 
-        # 源之间稍作间隔，避免集中请求被限流
-        time.sleep(SOURCE_INTERVAL)
 
-    # 生成多仓订阅文件（影视仓"订阅/多仓"格式）
-    sub_path = os.path.join(OUTPUT_DIR, "多仓订阅.json")
-    with open(sub_path, "w", encoding="utf-8") as f:
-        json.dump({"urls": subscriptions}, f, ensure_ascii=False, indent=2)
-
-    # 生成聚合单仓文件（把所有成功源的 sites/lives/parses 合并成一个单仓）
-    merged = merge_configs(fetched)
-    merged_path = os.path.join(OUTPUT_DIR, "单仓聚合.json")
-    if merged is not None:
-        with open(merged_path, "w", encoding="utf-8") as f:
-            json.dump(merged, f, ensure_ascii=False, indent=2)
-        print(f"聚合单仓：{merged_path}（共 {len(merged.get('sites', []))} 个站点）")
-
-    # 生成更新状态文件（时间取全部抓取完成之后）
-    status["updated_at"] = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-    with open(os.path.join(OUTPUT_DIR, "status.json"), "w", encoding="utf-8") as f:
-        json.dump(status, f, ensure_ascii=False, indent=2)
-
-    # 生成 shields 徽章并更新 README 状态表
-    total = len(cfg.get("sources", []))
-    write_badge(ok_count, total)
-    update_readme(status, ok_count, total)
-
-    print("\n" + "=" * 50)
-    print(f"本次更新：{ok_count}/{total} 个源成功")
-    print(f"多仓订阅：{sub_path}")
-    if ok_count == 0:
-        print("没有任何源更新成功，返回非 0 退出码。")
-        return 1
+def count_sites(kind, data):
+    if kind == "single" and isinstance(data, dict):
+        return len(data.get("sites", []))
+    if kind == "multi":
+        return len(multi_items(data))
+    if kind == "text":
+        return -1
     return 0
 
 
+def fetch_source(src):
+    name, sid = src["name"], src["id"]
+    attempts = []
+    for url in src.get("urls", []):
+        t0 = time.time()
+        body, code, ctype = fetch(url)
+        ms = int((time.time() - t0) * 1000)
+        if body is None:
+            attempts.append({"url": url, "code": "ERR", "kind": "err", "ms": ms, "note": str(code)[:60]})
+            continue
+        kind, data = classify(body)
+        attempts.append({"url": url, "code": str(code), "ctype": str(ctype)[:24],
+                         "size": len(body), "kind": kind, "ms": ms})
+        if kind in ("single", "multi", "text"):
+            return {"id": sid, "name": name, "ok": True, "kind": kind, "data": data,
+                    "raw_len": len(body), "ms": ms, "used_url": url, "attempts": attempts}
+    return {"id": sid, "name": name, "ok": False, "attempts": attempts}
+
+
+def load_cache(sid):
+    p = os.path.join(CACHE, sid + ".json")
+    if os.path.exists(p):
+        try:
+            with open(p, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def save_cache(sid, result):
+    os.makedirs(CACHE, exist_ok=True)
+    with open(os.path.join(CACHE, sid + ".json"), "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False)
+
+
+def write_json(path, obj):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(tmp, path)
+
+
+def localize_single(data, src_name):
+    """把单仓里每个站点加上来源前缀、过滤成人。"""
+    if not isinstance(data, dict):
+        return data
+    out = dict(data)
+    sites = []
+    for site in data.get("sites", []):
+        if not isinstance(site, dict):
+            continue
+        sn, api = site.get("name", ""), str(site.get("api", ""))
+        if is_adult(sn, api):
+            continue
+        s = dict(site)
+        s["name"] = f"[{src_name}] {sn}"
+        sites.append(s)
+    out["sites"] = sites
+    return out
+
+
+def main():
+    os.makedirs(OUTPUT, exist_ok=True)
+    os.makedirs(os.path.join(OUTPUT, "sources"), exist_ok=True)
+    cfg = json.load(open(CONFIG, encoding="utf-8"))
+    sources = [s for s in cfg["sources"] if s.get("enabled", True)]
+    print(f"[{datetime.now()}] 开始抓取 {len(sources)} 个源 (repo={REPO})", flush=True)
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        futs = {ex.submit(fetch_source, s): s for s in sources}
+        for f in as_completed(futs):
+            r = f.result()
+            results[r["id"]] = r
+
+    status_list, live_single, multi_urls = [], [], []
+    for s in sources:
+        sid, name = s["id"], s["name"]
+        r = results.get(sid, {"ok": False, "attempts": []})
+        cached = False
+        if not r["ok"]:
+            c = load_cache(sid)
+            if c and c.get("ok"):
+                r = dict(c)
+                r["from_cache"] = True
+                cached = True
+        if r.get("ok"):
+            if not cached:
+                save_cache(sid, r)
+            cnt = count_sites(r["kind"], r["data"])
+            status_list.append({"id": sid, "name": name, "status": "ok", "kind": r["kind"],
+                                "sites": cnt, "ms": r.get("ms", -1), "used": r.get("used_url", ""),
+                                "from_cache": cached, "attempts": r["attempts"]})
+            # 单独源文件
+            write_json(os.path.join(OUTPUT, "sources", sid + ".json"), r["data"])
+            if r["kind"] == "single" and isinstance(r["data"], dict):
+                for site in r["data"].get("sites", []):
+                    if not isinstance(site, dict):
+                        continue
+                    sn, api = site.get("name", ""), str(site.get("api", ""))
+                    if is_adult(sn, api):
+                        continue
+                    s2 = dict(site)
+                    s2["name"] = f"[{name}] {sn}"
+                    live_single.append(s2)
+            elif r["kind"] == "multi":
+                for sub_name, sub_url in multi_items(r["data"]):
+                    if sub_url and is_adult(sub_name, sub_url):
+                        continue
+                    if sub_url:
+                        multi_urls.append({"name": f"{name}-{sub_name}"[:30], "url": sub_url})
+            # 单仓源：多仓订阅指向本仓库的单源文件（配合缓存容错，上游挂了仍可用）
+            if r["kind"] == "single" and r.get("used_url"):
+                multi_urls.append({"name": name, "url": f"{RAW}/sources/{sid}.json"})
+        else:
+            status_list.append({"id": sid, "name": name, "status": "fail", "attempts": r.get("attempts", [])})
+
+    # 单仓聚合去重
+    seen, dedup = set(), []
+    for site in live_single:
+        key = str(site.get("key", "")) + "|" + str(site.get("api", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup.append(site)
+
+    now = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+    write_json(os.path.join(OUTPUT, "多仓订阅.json"), {"urls": multi_urls})
+    write_json(os.path.join(OUTPUT, "单仓聚合.json"), {"sites": dedup})
+
+    ok_cnt = sum(1 for s in status_list if s["status"] == "ok")
+    status = {"updated": now, "total": len(sources), "ok": ok_cnt,
+              "fail": len(sources) - ok_cnt, "merged_sites": len(dedup),
+              "filter_adult": FILTER_ADULT, "sources": status_list}
+    write_json(os.path.join(OUTPUT, "status.json"), status)
+    # shields 徽章
+    write_json(os.path.join(OUTPUT, "shield.json"), {
+        "schemaVersion": 1, "label": "可用源",
+        "message": f"{ok_cnt}/{len(sources)}",
+        "color": "brightgreen" if ok_cnt >= len(sources) * 0.6 else ("yellow" if ok_cnt >= 5 else "red")
+    })
+
+    gen_readme(status, multi_urls, dedup, now)
+    print(f"完成：{ok_cnt}/{len(sources)} 源可用，聚合 {len(dedup)} 站点", flush=True)
+    for s in status_list:
+        mark = "OK " if s["status"] == "ok" else "X  "
+        extra = f"{s.get('sites','')}站 {s.get('ms','')}ms" if s["status"] == "ok" else ""
+        print(f"  {mark}{s['name']:<14} {extra}", flush=True)
+
+
+def gen_readme(status, multi_urls, dedup, now):
+    rows = []
+    for s in status["sources"]:
+        if s["status"] == "ok":
+            badge = "✅ 成功" + ("（缓存）" if s.get("from_cache") else "")
+            detail = f"{s.get('sites','')} 站 · {s.get('ms','')}ms"
+        else:
+            badge, detail = "❌ 失败", "全部地址尝试失败"
+        rows.append(f"| {s['name']} | {badge} | {detail} |")
+    sources_md = "\n".join(rows)
+    multi_url = f"{RAW}/多仓订阅.json"
+    all_url = f"{RAW}/单仓聚合.json"
+    md = f"""# 影视仓 / TVBox 配置聚合（GitHub Actions 版）
+
+![配置状态](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2F{REPO}%2Fmain%2Foutput%2Fshield.json)
+![更新频率](https://img.shields.io/badge/%E6%9B%B4%E6%96%B0-%E6%AF%8F%E5%A4%A9%202%20%E6%AC%A1-blue)
+
+聚合 40+ 个知名 TVBox / 影视仓接口，通过 **GitHub Actions 云端定时自动更新**，结果提交回本仓库。已开启成人内容过滤、缓存容错、中文域名 punycode 兼容。
+
+> 所有配置来自互联网公开分享，版权归原作者所有；本仓库仅做聚合与镜像，仅供学习交流，请勿商用。
+
+---
+
+## 一、订阅地址（填进 TVBox / 影视仓）
+
+| 类型 | 地址 |
+| --- | --- |
+| **多仓订阅（推荐）** | `{multi_url}` |
+| **单仓聚合（所有站点合并）** | `{all_url}` |
+| 运行状态 | `{RAW}/status.json` |
+| 单独源 | `{RAW}/sources/源ID.json` |
+
+> 国内直连 `raw.githubusercontent.com` 若慢，可套加速前缀，如 `https://gh-proxy.com/` + 上面的完整地址。
+
+---
+
+## 二、源可用性状态
+
+<!-- STATUS_START -->
+> 🔄 最近更新：{now}（北京时间） · 成功 **{status['ok']}/{status['total']}** 个源 · 聚合 {len(dedup)} 站点
+
+| 配置源 | 状态 | 详情 |
+| --- | --- | --- |
+{sources_md}
+<!-- STATUS_END -->
+
+---
+
+## 三、自动更新机制
+
+- `.github/workflows/update.yml` 每天 **02:00 / 14:00 UTC**（北京 10:00 / 22:00）自动运行。
+- 也可在 **Actions → Auto Update → Run workflow** 手动触发。
+- 用内置 `GITHUB_TOKEN` 自动提交 `output/`，无需任何密钥。
+- push 只监听 `config/`、`scripts/`，自动提交 `output/` 不会死循环。
+
+## 四、自定义源
+
+编辑 `config/sources.json`，每个源格式：
+
+```json
+{{"id": "mysource", "name": "我的源", "enabled": true, "urls": ["主地址", "备用地址"]}}
+```
+
+推送后自动触发更新。失效源会保留记录，恢复后自动启用。
+"""
+    with open(os.path.join(BASE, "README.md"), "w", encoding="utf-8") as f:
+        f.write(md)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
