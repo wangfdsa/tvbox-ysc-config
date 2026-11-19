@@ -1,459 +1,290 @@
 {
-  "description": "知名 TVBox 订阅接口清单，含多线路备用地址；失效源保留记录便于观察恢复情况",
-  "note": "每个源 urls 按顺序尝试，第一个返回有效配置的地址胜出；镜像源(0.12yue.de5.net / jijietvbox.lol)为各知名源的第三方备份",
-  "sources": [
-    {
-      "id": "wangerxiao",
-      "name": "王二小",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://9280.kstore.vip/newwex.json",
-        "https://9280.kstore.space/wex.json",
-        "https://9280.kstore.space/aiwex.json",
-        "https://d.kstore.dev/download/9280/wex.json",
-        "https://0.12yue.de5.net/tvbox/王二小.json",
-        "https://jijietvbox.lol/jieluntan-wxe.json",
-        "http://new.王二小放牛娃.top",
-        "http://tvbox.王二小放牛娃.top",
-        "http://new.999888123.xyz/"
-      ]
-    },
-    {
-      "id": "laoliubei",
-      "name": "老刘备",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://raw.liucn.cc/box/m.json",
-        "https://raw.githubusercontent.com/liu673cn/box/main/m.json",
-        "https://cdn.jsdelivr.net/gh/liu673cn/box@main/m.json"
-      ]
-    },
-    {
-      "id": "xiaoma",
-      "name": "小马",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://szyyds.cn/tv/x.json",
-        "https://0.12yue.de5.net/tvbox/小马.json",
-        "https://jijietvbox.lol/jieluntan-xiaoma.json"
-      ]
-    },
-    {
-      "id": "facat",
-      "name": "肥猫",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://肥猫.net/tv",
-        "http://肥猫.net/",
-        "http://hello.肥猫.com",
-        "http://hello.肥猫.net",
-        "https://0.12yue.de5.net/tvbox/肥猫.json",
-        "https://w.junce.dpdns.org/fm.gif",
-        "https://6296.kstore.vip/facat.json"
-      ]
-    },
-    {
-      "id": "fantaiying",
-      "name": "饭太硬",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://jijietvbox.lol/jieluntan-fty.json",
-        "http://www.饭太硬.net/tv",
-        "http://www.饭太硬.art/tv",
-        "http://www.饭太硬.cc/tv",
-        "http://www.饭太硬.com/tv/",
-        "http://fty.xxooo.cf/tv",
-        "http://fty.888484.xyz/tv",
-        "http://fty.333232.xyz/tv"
-      ]
-    },
-    {
-      "id": "ouge",
-      "name": "讴歌/欧歌",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://tv.nxog.top/m/",
-        "https://欧歌.v.nxog.top/m/",
-        "https://xn--jory77o.v.nxog.top/m",
-        "http://m.nxog.top/nxog/ou1.php?url=http://tv.nxog.top&b=欧歌"
-      ]
-    },
-    {
-      "id": "xhz4k",
-      "name": "聚玩盒子4K",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://xhztv.top/4k.json",
-        "http://xhztv.top/xhz",
-        "https://0.12yue.de5.net/tvbox/聚玩.json"
-      ]
-    },
-    {
-      "id": "xhzsingle",
-      "name": "聚玩盒子单仓",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://xhztv.top/xhz",
-        "http://xhztv.top/4k.json"
-      ]
-    },
-    {
-      "id": "xhzmulti",
-      "name": "聚玩盒子多仓",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://xhztv.top/dc"
-      ]
-    },
-    {
-      "id": "shiguang",
-      "name": "拾光多仓",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://xmbjm.fh4u.org/dc.txt",
-        "https://gh-proxy.com/https://raw.githubusercontent.com/xmbjm/svip/refs/heads/main/svip.json",
-        "https://gitlab.com/xmbjm/omg/-/raw/main/omg.json"
-      ]
-    },
-    {
-      "id": "tinghao",
-      "name": "挺好分享",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://ztha.top/TVBox/GYCK.json",
-        "http://ztha.top/TVBox/thdjk.json",
-        "https://0.12yue.de5.net/tvbox/挺好.json"
-      ]
-    },
-    {
-      "id": "aowu",
-      "name": "嗷呜",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://9763.kstore.vip/aowu.json",
-        "https://0.12yue.de5.net/tvbox/嗷呜.json",
-        "https://jijietvbox.lol/jieluntan-aowu.json",
-        "http://itv666.cc/aowu/config.webp",
-        "http://www.英格里希嗷呜.top/tv"
-      ]
-    },
-    {
-      "id": "moyuer",
-      "name": "摸鱼儿",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://6800.kstore.vip/fish.json",
-        "https://0.12yue.de5.net/tvbox/摸鱼.json",
-        "http://我不是.摸鱼儿.top",
-        "http://我不是.摸鱼儿.cc",
-        "http://www.小不点.com"
-      ]
-    },
-    {
-      "id": "xiaosa",
-      "name": "潇洒",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://cnb.cool/fish2035/xs/-/git/raw/main/api.json",
-        "https://9877.kstore.space/one.json",
-        "https://qist.wyfc.qzz.io/xiaosa/api.json",
-        "https://0.12yue.de5.net/tvbox/潇洒.json",
-        "https://jijietvbox.lol/xiaosha.json"
-      ]
-    },
-    {
-      "id": "nanfeng",
-      "name": "南风",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://0.12yue.de5.net/tvbox/南风.json",
-        "https://agit.ai/Yoursmile7/TVBox/raw/branch/master/XC.json",
-        "https://gh-proxy.com/raw.githubusercontent.com/yoursmile66/TVBox/refs/heads/main/XC.json"
-      ]
-    },
-    {
-      "id": "qiaoji",
-      "name": "巧技",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://cdn.qiaoji8.com/tvbox.json",
-        "http://pandown.pro/tvbox/tvbox.json"
-      ]
-    },
-    {
-      "id": "okmao",
-      "name": "OK猫/OK吊炸天",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://ok321.top/tv",
-        "https://jihulab.com/okcaptain/kko/-/raw/main/tv.txt"
-      ]
-    },
-    {
-      "id": "cainisi",
-      "name": "菜妮丝/采妮诗",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://jijietvbox.lol/jieluntan-cns.json",
-        "https://tv.xn--yhqu5zs87a.top",
-        "https://0.12yue.de5.net/tvbox/菜妮丝.json",
-        "https://tvbox.cainisi.cf"
-      ]
-    },
-    {
-      "id": "xiaomi",
-      "name": "小米CatVod",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://gh-proxy.org/raw.githubusercontent.com/ggrrttyyiii/CatVodSpider/refs/heads/main/json/demo.json",
-        "https://0.12yue.de5.net/tvbox/小米.json",
-        "https://gitlab.com/tvtg/pg/-/raw/main/api.json"
-      ]
-    },
-    {
-      "id": "daozhang",
-      "name": "道长",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://pastebin.com/raw/5NHaxyGR"
-      ]
-    },
-    {
-      "id": "wuai",
-      "name": "吾爱",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://52bsj.vip:98/wuai"
-      ]
-    },
-    {
-      "id": "xingchen",
-      "name": "星辰",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://8.210.232.168/xc.json"
-      ]
-    },
-    {
-      "id": "yuanxing",
-      "name": "元兴",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://freed.yuanhsing.cf/TVBox/meowcf.json"
-      ]
-    },
-    {
-      "id": "chunyingtianxia",
-      "name": "春盈天下",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://盒子迷.top/春盈天下",
-        "https://0.12yue.de5.net/tvbox/春盈天下.json"
-      ]
-    },
-    {
-      "id": "qieziku",
-      "name": "茄子库",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://700sjro44343.vicp.fun/vip/2505/qiezi/duo.txt",
-        "http://boluo.live",
-        "http://vip.boluo.live",
-        "http://李白.shop",
-        "https://700sjro44343.vicp.fun/vip/2505/qiezi/tv.php"
-      ]
-    },
-    {
-      "id": "junlao",
-      "name": "俊佬",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://home.jundie.top:81/top98.json"
-      ]
-    },
-    {
-      "id": "jianpian",
-      "name": "荐片",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://tv.203511.xyz/0821.json"
-      ]
-    },
-    {
-      "id": "yingshicang",
-      "name": "影视仓",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "http://124.71.19.220/c/1",
-        "http://www.影视仓.com",
-        "https://700sjro44343.vicp.fun/240731/one/"
-      ]
-    },
-    {
-      "id": "tianwei",
-      "name": "天微多仓",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://tvkj.top/DC.txt",
-        "https://qixing.myhkw.com/DC.txt"
-      ]
-    },
-    {
-      "id": "wuxie",
-      "name": "无邪多仓",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://gh-proxy.com/https://raw.githubusercontent.com/wxrjck/-YSC-/refs/heads/main/wx.json"
-      ]
-    },
-    {
-      "id": "dongli",
-      "name": "东篱",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://0.12yue.de5.net/tvbox/东篱.json"
-      ]
-    },
-    {
-      "id": "zhouj",
-      "name": "周J",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://0.12yue.de5.net/tvbox/周J.json"
-      ]
-    },
-    {
-      "id": "hezimi",
-      "name": "盒子迷",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://盒子迷.top/禁止贩卖",
-        "http://盒子迷.top/禁止贩卖"
-      ]
-    },
-    {
-      "id": "yemaozi",
-      "name": "夜猫子",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://download.kstore.space/download/3313/mao/ymz"
-      ]
-    },
-    {
-      "id": "chuanshuo",
-      "name": "传说",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://chuanshuo.77blog.cn/tv.json"
-      ]
-    },
-    {
-      "id": "shenmide",
-      "name": "神秘的哥哥们",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://play.iptv365.org/tvbox.txt"
-      ]
-    },
-    {
-      "id": "huanyuxuan",
-      "name": "环宇轩",
-      "tier": "知名",
-      "enabled": true,
-      "urls": [
-        "https://6492.kstore.space/xnf/xnf.json"
-      ]
-    },
-    {
-      "id": "juyuan",
-      "name": "荐片/俊哥备用",
-      "tier": "小众",
-      "enabled": true,
-      "urls": [
-        "http://home.jundie.top:81/top98.json"
-      ]
-    },
-    {
-      "id": "jettwo",
-      "name": "集多",
-      "tier": "小众",
-      "enabled": true,
-      "urls": [
-        "http://rihou.cc:88/demo.php",
-        "https://0.12yue.de5.net/tvbox/集多.json"
-      ]
-    },
-    {
-      "id": "chimao",
-      "name": "吃猫的鱼",
-      "tier": "小众",
-      "enabled": true,
-      "urls": [
-        "https://d.kstore.dev/download/7213/吃猫的鱼"
-      ]
-    },
-    {
-      "id": "shaoner",
-      "name": "少儿频道",
-      "tier": "分类",
-      "enabled": true,
-      "urls": [
-        "https://gh-proxy.com/raw.githubusercontent.com/lubin776/0/refs/heads/main/tvbox/b2.json"
-      ]
-    },
-    {
-      "id": "xiqu",
-      "name": "戏曲音乐",
-      "tier": "分类",
-      "enabled": true,
-      "urls": [
-        "https://z.qiqiv.cn/666"
-      ]
-    },
-    {
-      "id": "xiaohuban",
-      "name": "小虎斑",
-      "tier": "小众",
-      "enabled": true,
-      "urls": [
-        "http://hb.小虎斑.site:25252/仅供测试"
-      ]
-    }
-  ]
+ "description": "知名 TVBox 订阅接口清单，含多线路备用地址；失效源保留记录便于观察恢复情况",
+ "note": "每个源 urls 按顺序尝试，第一个返回有效配置的地址胜出；镜像源(0.12yue.de5.net / jijietvbox.lol)为各知名源的第三方备份",
+ "sources": [
+  {
+   "id": "wangerxiao",
+   "name": "王二小",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://9280.kstore.vip/newwex.json",
+    "https://9280.kstore.space/wex.json",
+    "https://9280.kstore.space/aiwex.json",
+    "https://d.kstore.dev/download/9280/wex.json",
+    "https://0.12yue.de5.net/tvbox/王二小.json",
+    "https://jijietvbox.lol/jieluntan-wxe.json",
+    "http://new.王二小放牛娃.top",
+    "http://tvbox.王二小放牛娃.top",
+    "http://new.999888123.xyz/"
+   ]
+  },
+  {
+   "id": "laoliubei",
+   "name": "老刘备",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://raw.liucn.cc/box/m.json",
+    "https://raw.githubusercontent.com/liu673cn/box/main/m.json",
+    "https://cdn.jsdelivr.net/gh/liu673cn/box@main/m.json"
+   ]
+  },
+  {
+   "id": "xiaoma",
+   "name": "小马",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://szyyds.cn/tv/x.json",
+    "https://0.12yue.de5.net/tvbox/小马.json",
+    "https://jijietvbox.lol/jieluntan-xiaoma.json"
+   ]
+  },
+  {
+   "id": "facat",
+   "name": "肥猫",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://肥猫.net/tv",
+    "http://肥猫.net/",
+    "http://hello.肥猫.com",
+    "http://hello.肥猫.net",
+    "https://0.12yue.de5.net/tvbox/肥猫.json",
+    "https://w.junce.dpdns.org/fm.gif",
+    "https://6296.kstore.vip/facat.json"
+   ]
+  },
+  {
+   "id": "fantaiying",
+   "name": "饭太硬",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://jijietvbox.lol/jieluntan-fty.json",
+    "http://www.饭太硬.net/tv",
+    "http://www.饭太硬.art/tv",
+    "http://www.饭太硬.cc/tv",
+    "http://www.饭太硬.com/tv/",
+    "http://fty.xxooo.cf/tv",
+    "http://fty.888484.xyz/tv",
+    "http://fty.333232.xyz/tv"
+   ]
+  },
+  {
+   "id": "ouge",
+   "name": "讴歌/欧歌",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://tv.nxog.top/m/",
+    "https://欧歌.v.nxog.top/m/",
+    "https://xn--jory77o.v.nxog.top/m",
+    "http://m.nxog.top/nxog/ou1.php?url=http://tv.nxog.top&b=欧歌"
+   ]
+  },
+  {
+   "id": "xhz4k",
+   "name": "聚玩盒子4K",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://xhztv.top/4k.json",
+    "http://xhztv.top/xhz",
+    "https://0.12yue.de5.net/tvbox/聚玩.json"
+   ]
+  },
+  {
+   "id": "xhzsingle",
+   "name": "聚玩盒子单仓",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://xhztv.top/xhz",
+    "http://xhztv.top/4k.json"
+   ]
+  },
+  {
+   "id": "xhzmulti",
+   "name": "聚玩盒子多仓",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://xhztv.top/dc"
+   ]
+  },
+  {
+   "id": "shiguang",
+   "name": "拾光多仓",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://xmbjm.fh4u.org/dc.txt",
+    "https://gh-proxy.com/https://raw.githubusercontent.com/xmbjm/svip/refs/heads/main/svip.json",
+    "https://gitlab.com/xmbjm/omg/-/raw/main/omg.json"
+   ]
+  },
+  {
+   "id": "tinghao",
+   "name": "挺好分享",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://ztha.top/TVBox/GYCK.json",
+    "http://ztha.top/TVBox/thdjk.json",
+    "https://0.12yue.de5.net/tvbox/挺好.json"
+   ]
+  },
+  {
+   "id": "aowu",
+   "name": "嗷呜",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://9763.kstore.vip/aowu.json",
+    "https://0.12yue.de5.net/tvbox/嗷呜.json",
+    "https://jijietvbox.lol/jieluntan-aowu.json",
+    "http://itv666.cc/aowu/config.webp",
+    "http://www.英格里希嗷呜.top/tv"
+   ]
+  },
+  {
+   "id": "moyuer",
+   "name": "摸鱼儿",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://6800.kstore.vip/fish.json",
+    "https://0.12yue.de5.net/tvbox/摸鱼.json",
+    "http://我不是.摸鱼儿.top",
+    "http://我不是.摸鱼儿.cc",
+    "http://www.小不点.com"
+   ]
+  },
+  {
+   "id": "xiaosa",
+   "name": "潇洒",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://cnb.cool/fish2035/xs/-/git/raw/main/api.json",
+    "https://9877.kstore.space/one.json",
+    "https://qist.wyfc.qzz.io/xiaosa/api.json",
+    "https://0.12yue.de5.net/tvbox/潇洒.json",
+    "https://jijietvbox.lol/xiaosha.json"
+   ]
+  },
+  {
+   "id": "nanfeng",
+   "name": "南风",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://0.12yue.de5.net/tvbox/南风.json",
+    "https://agit.ai/Yoursmile7/TVBox/raw/branch/master/XC.json",
+    "https://gh-proxy.com/raw.githubusercontent.com/yoursmile66/TVBox/refs/heads/main/XC.json"
+   ]
+  },
+  {
+   "id": "cainisi",
+   "name": "菜妮丝/采妮诗",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://jijietvbox.lol/jieluntan-cns.json",
+    "https://tv.xn--yhqu5zs87a.top",
+    "https://0.12yue.de5.net/tvbox/菜妮丝.json",
+    "https://tvbox.cainisi.cf"
+   ]
+  },
+  {
+   "id": "xiaomi",
+   "name": "小米CatVod",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://gh-proxy.org/raw.githubusercontent.com/ggrrttyyiii/CatVodSpider/refs/heads/main/json/demo.json",
+    "https://0.12yue.de5.net/tvbox/小米.json",
+    "https://gitlab.com/tvtg/pg/-/raw/main/api.json"
+   ]
+  },
+  {
+   "id": "qieziku",
+   "name": "茄子库",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://700sjro44343.vicp.fun/vip/2505/qiezi/duo.txt",
+    "http://boluo.live",
+    "http://vip.boluo.live",
+    "http://李白.shop",
+    "https://700sjro44343.vicp.fun/vip/2505/qiezi/tv.php"
+   ]
+  },
+  {
+   "id": "junlao",
+   "name": "俊佬",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "http://home.jundie.top:81/top98.json"
+   ]
+  },
+  {
+   "id": "jianpian",
+   "name": "荐片",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://tv.203511.xyz/0821.json"
+   ]
+  },
+  {
+   "id": "wuxie",
+   "name": "无邪多仓",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://gh-proxy.com/https://raw.githubusercontent.com/wxrjck/-YSC-/refs/heads/main/wx.json"
+   ]
+  },
+  {
+   "id": "dongli",
+   "name": "东篱",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://0.12yue.de5.net/tvbox/东篱.json"
+   ]
+  },
+  {
+   "id": "zhouj",
+   "name": "周J",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://0.12yue.de5.net/tvbox/周J.json"
+   ]
+  },
+  {
+   "id": "hezimi",
+   "name": "盒子迷",
+   "tier": "知名",
+   "enabled": true,
+   "urls": [
+    "https://盒子迷.top/禁止贩卖",
+    "http://盒子迷.top/禁止贩卖"
+   ]
+  },
+  {
+   "id": "juyuan",
+   "name": "荐片/俊哥备用",
+   "tier": "小众",
+   "enabled": true,
+   "urls": [
+    "http://home.jundie.top:81/top98.json"
+   ]
+  }
+ ]
 }
