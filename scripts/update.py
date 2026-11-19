@@ -37,6 +37,15 @@ FILTER_ADULT = True
 ADULT_NAME = ["黄av","黄人","成人","色猫","色播","色情","性爱","湿妹","抖阴","souav","jav","18+","🔞","萝莉","麻豆","白嫖","番号","福利姬","偷拍","丝袜","美腿","人妻","熟女","御姐","乱伦","女优","porn","redtube","pornhub","missav","18av","sukebei","小黄书","涩涩","jable","netflav","youav","hanime","淫","艳","骚"]
 ADULT_HOST = ["souav","sex","porn","jav","xvideos","xnxx","18av","caijiav","avzy"]
 
+# 用户明确要求移除的源名（含多仓源内部展开的同名子订阅），命中即剔除
+REMOVE_NAMES = ["集多","吃猫的鱼","少儿频道","戏曲音乐","小虎斑","夜猫子","传说","神秘的哥哥们",
+                "环宇轩","影视仓","天微多仓","道长","吾爱","星辰","元兴","春盈天下","巧技","OK猫","OK吊炸天"]
+
+
+def is_removed(name=""):
+    n = str(name or "")
+    return any(k in n for k in REMOVE_NAMES)
+
 
 def is_adult(name="", api=""):
     if not FILTER_ADULT:
@@ -267,6 +276,8 @@ def main():
             elif r["kind"] == "multi":
                 for sub_name, sub_url in multi_items(r["data"]):
                     if sub_url and is_adult(sub_name, sub_url):
+                        continue
+                    if sub_name and is_removed(sub_name):
                         continue
                     if sub_url:
                         multi_urls.append({"name": f"{name}-{sub_name}"[:30], "url": sub_url})
